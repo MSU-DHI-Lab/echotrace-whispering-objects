@@ -11,10 +11,10 @@ except ImportError:  # pragma: no cover - executed in test/mock environments
     _PWMLED = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
-    from gpiozero import PWMLED as _PWMLEDForType  # type: ignore[import]
+    from gpiozero import PWMLED as PWMLEDType  # type: ignore[import]
 else:
 
-    class PWMLEDAlias:  # type: ignore[too-many-instance-attributes]
+    class PWMLEDType:  # type: ignore[too-many-instance-attributes]
         """Very small fallback implementation for environments without gpiozero."""
 
         def __init__(self, pin: int, frequency: int | None = None) -> None:  # noqa: D401
