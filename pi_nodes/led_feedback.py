@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - executed in test/mock environments
     _PWMLED = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
-    from gpiozero import PWMLED as _PWMLEDAlias  # type: ignore[import]
+    from gpiozero import PWMLED as PWMLEDAlias  # type: ignore[import]
 else:
 
     class PWMLEDAlias:  # type: ignore[too-many-instance-attributes]
