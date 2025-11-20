@@ -26,7 +26,13 @@ class FakeMQTT:
         self.published: List[Tuple[str, Any]] = []
         self.subscriptions: List[str] = []
 
-    def publish(self, topic: str, payload: str, qos: int = 0, retain: bool = False):  # noqa: ARG002
+    def publish(
+        self,
+        topic: str,
+        payload: str,
+        qos: int = 0,
+        retain: bool = False,
+    ) -> object:  # noqa: ARG002
         self.published.append((topic, json.loads(payload)))
 
         class Info:

@@ -22,6 +22,7 @@ from flask import (
     send_file,
     url_for,
 )
+from werkzeug.wrappers.response import Response as WerkzeugResponse
 
 from .accessibility_store import (
     ACCESSIBILITY_PATH,
@@ -478,10 +479,10 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     return app
 
 
-def _auth_required_response() -> Response:
+def _auth_required_response() -> WerkzeugResponse:
     response = Response(status=401)
     response.headers["WWW-Authenticate"] = 'Basic realm="EchoTrace"'
-    return cast(Response, response)
+    return response
 
 
 def _require_json(req: Request) -> dict[str, Any]:
