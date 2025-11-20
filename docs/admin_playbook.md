@@ -34,7 +34,7 @@ This playbook outlines daily routines, accessibility management, troubleshooting
 
 ## Accessibility Suite
 
-- **Global toggles** – Captions, high contrast theme, sensory-friendly pacing (slower audio, lower volume), safety limiter, quiet hours (list of time ranges such as `"20:00-09:00"`).
+- **Global toggles** – Captions, high contrast theme, sensory-friendly pacing (slower audio, lower volume), safety limiter, quiet hours (list of `HH:MM-HH:MM` ranges such as `"20:00-09:00"` that dim LEDs and lower volume automatically).
 - **Presets** – Hard of hearing (captions, limiter), Low vision (captions, high contrast), Sensory friendly (lower volume/pace, limiter), Mobility aware (extra mobility buffer before playback).
 - **Per-node overrides** – Adjust LED behaviour (`visual_pulse`, `proximity_glow`), haptic pacing (`repeat`, `pace`), mobility buffer, and per-node volume. Overrides persist in `hub/accessibility_profiles.yaml` and reapply on boot.
 

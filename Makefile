@@ -4,7 +4,7 @@ PYTHON ?= python3
 
 install:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.txt -r requirements-dev.txt
 
 lint:
 	ruff check .
@@ -15,6 +15,8 @@ typecheck:
 
 test:
 	pytest
+
+verify: lint typecheck test
 
 run-hub:
 	$(PYTHON) -m hub.run_hub

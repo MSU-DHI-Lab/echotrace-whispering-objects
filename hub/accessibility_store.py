@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime, time as time_cls
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ def load_profiles(path: Path | None = None) -> dict[str, Any]:
     data.setdefault("global", {})
     data.setdefault("presets", {})
     data.setdefault("per_node_overrides", {})
+    ensure_quiet_hours_valid(data["global"].get("quiet_hours"))
     return data
 
 
@@ -69,21 +71,29 @@ def set_per_node_override(
 def derive_runtime_payloads(
     profiles: dict[str, Any],
     nodes: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Return node-specific configuration payloads derived from accessibility settings."""
     global_settings = _ensure_mapping(profiles.get("global"))
     overrides = _ensure_mapping(profiles.get("per_node_overrides"))
+    quiet_hours_active = _quiet_hours_active(global_settings.get("quiet_hours"), now=now)
 
     payloads: dict[str, dict[str, Any]] = {}
     for node_id in nodes.keys():
         node_override = _ensure_mapping(overrides.get(node_id))
-        payloads[node_id] = _build_node_payload(global_settings, node_override)
+        payloads[node_id] = _build_node_payload(
+            global_settings,
+            node_override,
+            quiet_mode=quiet_hours_active,
+        )
     return payloads
 
 
 def _build_node_payload(
     global_settings: dict[str, Any],
     node_override: dict[str, Any],
+    quiet_mode: bool,
 ) -> dict[str, Any]:
     captions = bool(node_override.get("captions", global_settings.get("captions", False)))
     visual_pulse = bool(node_override.get("visual_pulse", False))
@@ -106,9 +116,15 @@ def _build_node_payload(
         volume = 0.7
         if global_settings.get("sensory_friendly"):
             volume = min(volume, 0.55)
-        if global_settings.get("quiet_hours"):
+        if quiet_mode:
             volume = min(volume, 0.45)
     volume = _clamp_float(volume, 0.0, 1.0)
+
+    if quiet_mode:
+        if "visual_pulse" not in node_override:
+            visual_pulse = False
+        if "proximity_glow" not in node_override:
+            proximity_glow = False
 
     accessibility_payload = {
         "captions": captions,
@@ -148,10 +164,88 @@ def _clamp_float(value: Any, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, number))
 
 
+def _quiet_hours_active(config_value: Any, now: datetime | None = None) -> bool:
+    windows = _normalise_quiet_hours(config_value)
+    if not windows:
+        return False
+    current = (now or datetime.now()).time()
+    for start, end in windows:
+        if start <= end:
+            if start <= current < end:
+                return True
+        else:
+            if current >= start or current < end:
+                return True
+    return False
+
+
+def _normalise_quiet_hours(value: Any) -> list[tuple[time_cls, time_cls]]:
+    try:
+        candidates = _coerce_quiet_hour_entries(value)
+    except ValueError:
+        return []
+    windows: list[tuple[time_cls, time_cls]] = []
+    for entry in candidates:
+        parts = [part.strip() for part in entry.split("-", 1)]
+        if len(parts) != 2:
+            continue
+        start = _parse_time(parts[0])
+        end = _parse_time(parts[1])
+        if start is None or end is None:
+            continue
+        windows.append((start, end))
+    return windows
+
+
+def _parse_time(value: str) -> time_cls | None:
+    try:
+        hours, minutes = value.split(":", 1)
+        hour_i = int(hours)
+        minute_i = int(minutes)
+        if not (0 <= hour_i < 24 and 0 <= minute_i < 60):
+            return None
+        return time_cls(hour=hour_i, minute=minute_i)
+    except ValueError:
+        return None
+
+
+def _coerce_quiet_hour_entries(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, Mapping):
+        raise ValueError("quiet_hours must be a list of HH:MM-HH:MM strings.")
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, Sequence):
+        candidates = [str(item) for item in value]
+    else:
+        raise ValueError("quiet_hours must be provided as a string or list.")
+    return [entry.strip() for entry in candidates if entry and entry.strip()]
+
+
+def ensure_quiet_hours_valid(value: Any) -> None:
+    entries = _coerce_quiet_hour_entries(value)
+    if not entries:
+        return
+    invalid: list[str] = []
+    for entry in entries:
+        parts = [part.strip() for part in entry.split("-", 1)]
+        if len(parts) != 2:
+            invalid.append(entry)
+            continue
+        if _parse_time(parts[0]) is None or _parse_time(parts[1]) is None:
+            invalid.append(entry)
+    if invalid:
+        raise ValueError(
+            "Invalid quiet_hours entries (expected HH:MM-HH:MM): " + ", ".join(invalid)
+        )
+
+
 __all__ = [
     "ACCESSIBILITY_PATH",
     "apply_preset",
     "derive_runtime_payloads",
+    "ensure_quiet_hours_valid",
     "load_profiles",
     "save_profiles",
     "set_per_node_override",

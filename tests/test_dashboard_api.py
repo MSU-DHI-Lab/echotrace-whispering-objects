@@ -10,16 +10,31 @@ from typing import Any, Dict, Tuple
 import pytest
 import yaml  # type: ignore[import]
 
+from hub.hub_listener import ConfigPushError
 
 class FakeHubController:
     """Capture configuration pushes without requiring a live broker."""
 
     def __init__(self) -> None:
         self.calls: list[Tuple[str, Dict[str, Any]]] = []
+        self.state: Dict[str, Any] = {"unlocked": False, "triggered": []}
+        self.health: Dict[str, float] = {}
+        self.error: ConfigPushError | None = None
 
     def push_node_config(self, node_id: str, payload: Dict[str, Any]) -> bool:
+        if self.error:
+            raise self.error
         self.calls.append((node_id, payload))
         return True
+
+    def get_state_snapshot(self) -> Dict[str, Any]:
+        return dict(self.state)
+
+    def reset_state(self) -> None:
+        self.state = {"unlocked": False, "triggered": []}
+
+    def get_health_snapshot(self) -> Dict[str, float]:
+        return dict(self.health)
 
 
 def _auth_header() -> dict[str, str]:
@@ -84,7 +99,7 @@ def test_apply_preset_triggers_push(client) -> None:
     testing_client, controller, _path = client
     controller.calls.clear()
     response = testing_client.post(
-        "/api/apply_preset",
+        "/api/apply-preset",
         json={"preset_name": "hard_of_hearing"},
         headers=_auth_header(),
     )
@@ -93,6 +108,30 @@ def test_apply_preset_triggers_push(client) -> None:
     assert data["ok"] is True
     assert controller.calls, "Expected accessibility broadcast to invoke controller."
     assert "object1" in data["push"]
+
+
+def test_push_config_conflict_returns_error(client) -> None:
+    """Conflicting config pushes should return HTTP 409."""
+    testing_client, controller, _path = client
+    controller.error = ConfigPushError("already busy", status_code=409)
+    response = testing_client.post(
+        "/api/push-config",
+        json={"node_id": "object1", "payload": {"audio": {"volume": 0.5}}},
+        headers=_auth_header(),
+    )
+    assert response.status_code == 409
+    controller.error = None
+
+
+def test_invalid_quiet_hours_rejected(client) -> None:
+    """Invalid quiet hour entries should return 400."""
+    testing_client, _controller, _path = client
+    response = testing_client.post(
+        "/api/apply-preset",
+        json={"global": {"quiet_hours": ["invalid"]}},
+        headers=_auth_header(),
+    )
+    assert response.status_code == 400
 
 
 def test_set_per_node_override_updates_yaml(client) -> None:

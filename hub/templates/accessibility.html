@@ -52,7 +52,7 @@
                 >
             </label>
         </div>
-        <label for="quiet_hours">Quiet hours (JSON array)</label>
+        <label for="quiet_hours">Quiet hours (JSON array, HH:MM-HH:MM)</label>
         <textarea id="quiet_hours" name="global.quiet_hours" placeholder='["20:00-09:00"]'>{{ global_settings.get('quiet_hours', []) | tojson }}</textarea>
         <button type="submit">Save Toggles</button>
     </form>

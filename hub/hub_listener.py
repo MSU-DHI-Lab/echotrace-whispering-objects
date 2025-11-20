@@ -35,6 +35,14 @@ _TRIGGER_PREFIX = f"{trigger_wildcard().rsplit('/', 1)[0]}/"
 _ACK_PREFIX = node_ack_topic("")
 
 
+class ConfigPushError(RuntimeError):
+    """Raised when a configuration push cannot complete."""
+
+    def __init__(self, message: str, status_code: int = 409) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 @dataclass
 class HubRuntimeState:
     """In-memory snapshot of hub observability data."""
@@ -120,6 +128,10 @@ class HubListener:
         message = json.dumps(payload)
         ack_event = threading.Event()
         with self._ack_lock:
+            if node_id in self._ack_events:
+                raise ConfigPushError(
+                    f"Configuration push already in progress for {node_id}.", status_code=409
+                )
             self._ack_events[node_id] = ack_event
 
         info = self._client.publish(node_config_topic(node_id), message, qos=1)
@@ -127,7 +139,10 @@ class HubListener:
             LOGGER.error("Failed to publish configuration to %s: rc=%s", node_id, info.rc)
             with self._ack_lock:
                 self._ack_events.pop(node_id, None)
-            return False
+            raise ConfigPushError(
+                f"Unable to publish configuration to {node_id} (rc={info.rc}).",
+                status_code=502,
+            )
 
         LOGGER.info("Pushed configuration to %s, awaiting acknowledgement.", node_id)
         if ack_event.wait(timeout):
@@ -138,7 +153,10 @@ class HubListener:
         self._event_logger.record_event("config_push_timeout", node_id, message)
         with self._ack_lock:
             self._ack_events.pop(node_id, None)
-        return False
+        raise ConfigPushError(
+            f"Configuration push to {node_id} timed out after {timeout:.1f}s.",
+            status_code=504,
+        )
 
     def reset_state(self) -> None:
         """Clear the narrative state and retain heartbeat history."""

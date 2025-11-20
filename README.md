@@ -117,14 +117,21 @@ See `docs/hardware_setup.md` for detailed wiring, installation, and maintenance 
 
 To set up a local development environment:
 
-1. Create a virtual environment and install dependencies:
+1. Create a virtual environment and install dependencies (runtime + tooling):
    ```
    python3 -m venv .venv
    source .venv/bin/activate
-   pip install -r requirements.txt
-   ruff check . && mypy . && pytest
+   pip install -r requirements.txt -r requirements-dev.txt
    ```
-2. Run the hub and node services in mock mode for testing:
+   The `make install` target performs the same steps.
+2. Run the full verification suite:
+   ```
+   ruff check .
+   mypy .
+   pytest
+   ```
+   The Makefile provides shortcuts: `make lint`, `make typecheck`, `make test`, or `make verify` to run all three.
+3. Run the hub and node services in mock mode for testing:
    - `make run-hub` starts the dashboard and listener in development mode.  
    - `make run-node` starts a mocked node service loop using test hardware mocks.
 

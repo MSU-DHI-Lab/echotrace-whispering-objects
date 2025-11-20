@@ -17,7 +17,7 @@ Accessible via the dashboard’s **Accessibility** tab:
 - **Sensory-friendly mode** – Lowers default volume, slows pacing, and sets gentle LED glow to reduce overstimulation.
 - **Safety limiter** – Caps maximum audio volume across nodes (enabled by default).
 - **Mobility buffer** – Adds a delay (in milliseconds) before audio triggers, useful for visitors using mobility devices.
-- **Quiet hours** – List of time ranges (e.g., `"18:00-09:00"`) which lower visibility and volume for evening programs.
+- **Quiet hours** – List of time ranges in `HH:MM-HH:MM` (e.g., `"18:00-09:00"`) which dim LEDs, pause visual pulses, and reduce volume during calm periods.
 
 ## Presets
 
@@ -36,7 +36,7 @@ Staff can highlight specific narratives or accommodate visitors at a particular 
 - `proximity_glow` – Enable/disable ambient glow to reduce distraction.
 - `mobility_buffer_ms` – Extra delay before audio plays (0–60,000 ms).
 - `repeat` – Number of automatic replays (0–2) for visitors who want more processing time.
-- `pace` – Playback rate (0.85–1.15) for nuanced comprehension.
+- `pace` – Playback rate (0.85–1.15) for nuanced comprehension (applies directly when fragments are packaged as WAV files; other formats fall back to default speed).
 - `safety_limiter` – Relax or enforce the limiter locally.
 - `volume` – Optional per-node volume cap (0.0–1.0) when fine control is needed.
 

@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Optional, Protocol, TypeVar, Union, cast
 
 from flask import (
     Flask,
@@ -27,14 +27,53 @@ from .accessibility_store import (
     ACCESSIBILITY_PATH,
     apply_preset,
     derive_runtime_payloads,
+    ensure_quiet_hours_valid,
     load_profiles,
     save_profiles,
     set_per_node_override,
 )
 from .config_loader import HubConfig, load_config
 from .content_manager import ContentManager, ContentPack, MediaAsset
+from .hub_listener import ConfigPushError
 from .event_logging import CsvEventLogger, summarize_events
 from .narrative_state import NarrativeState
+
+
+class HubControllerProtocol(Protocol):
+    def push_node_config(self, node_id: str, payload: dict[str, Any]) -> bool:
+        ...
+
+    def get_state_snapshot(self) -> dict[str, Any]:
+        ...
+
+    def reset_state(self) -> None:
+        ...
+
+    def get_health_snapshot(self) -> dict[str, float]:
+        ...
+
+
+class InProcessHubController:
+    """Minimal controller used when no HubListener is attached."""
+
+    def __init__(self, narrative_state: NarrativeState) -> None:
+        self._state = narrative_state
+        self._health: dict[str, float] = {}
+
+    def push_node_config(self, node_id: str, payload: dict[str, Any]) -> bool:  # pragma: no cover
+        logging.getLogger(__name__).debug(
+            "In-process hub controller received push for %s: %s", node_id, payload
+        )
+        return True
+
+    def get_state_snapshot(self) -> dict[str, Any]:
+        return self._state.snapshot()
+
+    def reset_state(self) -> None:
+        self._state.reset()
+
+    def get_health_snapshot(self) -> dict[str, float]:
+        return dict(self._health)
 
 
 @dataclass
@@ -44,10 +83,10 @@ class DashboardContext:
     config: HubConfig
     content_manager: ContentManager
     accessibility: dict[str, Any]
-    narrative_state: NarrativeState
     current_pack: ContentPack | None = None
-    health_snapshot: dict[str, float] = field(default_factory=dict)
-    hub_controller: Optional[Any] = None
+    hub_controller: HubControllerProtocol | None = None
+    _last_state: dict[str, Any] = field(default_factory=dict)
+    _last_health: dict[str, float] = field(default_factory=dict)
 
     def select_pack(self, pack_name: str) -> ContentPack:
         pack = self.content_manager.load_pack(pack_name)
@@ -60,16 +99,17 @@ class DashboardContext:
     def push_config_to_node(self, node_id: str, payload: dict[str, Any]) -> bool:
         controller = self.hub_controller
         if controller is None:
-            logging.getLogger(__name__).debug(
-                "No hub controller configured; assuming config push to %s succeeded.",
-                node_id,
-            )
-            return True
+            raise ConfigPushError("Hub controller unavailable.", status_code=503)
         try:
             return bool(controller.push_node_config(node_id, payload))
+        except ConfigPushError:
+            raise
         except Exception as exc:  # pragma: no cover - defensive logging
             logging.getLogger(__name__).warning("Failed to push config to %s: %s", node_id, exc)
-            return False
+            raise ConfigPushError(
+                f"Unexpected error while pushing configuration to {node_id}: {exc}",
+                status_code=502,
+            ) from exc
 
     def push_accessibility_configs(self) -> dict[str, bool]:
         if not self.current_pack:
@@ -79,6 +119,47 @@ class DashboardContext:
         for node_id, payload in payloads.items():
             results[node_id] = self.push_config_to_node(node_id, payload)
         return results
+
+    def state_snapshot(self) -> dict[str, Any]:
+        controller = self.hub_controller
+        if controller is None:
+            return dict(self._last_state)
+        try:
+            snapshot = dict(controller.get_state_snapshot())
+            self._last_state = snapshot
+            return snapshot
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logging.getLogger(__name__).warning(
+                "Failed to pull state snapshot from hub controller: %s", exc
+            )
+            return dict(self._last_state)
+
+    def health_snapshot(self) -> dict[str, float]:
+        controller = self.hub_controller
+        if controller is None:
+            return dict(self._last_health)
+        try:
+            snapshot = dict(controller.get_health_snapshot())
+            self._last_health = snapshot
+            return snapshot
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logging.getLogger(__name__).warning(
+                "Failed to pull health snapshot from hub controller: %s", exc
+            )
+            return dict(self._last_health)
+
+    def reset_state(self) -> dict[str, Any]:
+        controller = self.hub_controller
+        if controller is None:
+            return {}
+        try:
+            controller.reset_state()
+            return self.state_snapshot()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logging.getLogger(__name__).warning(
+                "Failed to reset hub controller narrative state: %s", exc
+            )
+            return {}
 
 
 def create_app(config: HubConfig | None = None, hub_controller: Any | None = None) -> Flask:
@@ -92,14 +173,16 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     )
 
     accessibility = load_profiles(ACCESSIBILITY_PATH)
+    narrative_state = NarrativeState(
+        required_fragments=hub_config.narrative.required_fragments_to_unlock
+    )
+    controller = hub_controller or InProcessHubController(narrative_state)
+
     context = DashboardContext(
         config=hub_config,
         content_manager=ContentManager(),
         accessibility=accessibility,
-        narrative_state=NarrativeState(
-            required_fragments=hub_config.narrative.required_fragments_to_unlock
-        ),
-        hub_controller=hub_controller,
+        hub_controller=controller,
     )
 
     available_packs = context.content_manager.list_packs()
@@ -110,7 +193,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
             app.logger.warning("Failed to load initial pack '%s': %s", available_packs[0], exc)
 
     app.config["DASHBOARD_CONTEXT"] = context
-    app.config["HUB_CONTROLLER"] = hub_controller
+    app.config["HUB_CONTROLLER"] = controller
 
     credentials: Optional[tuple[str, str]] = None
     if hub_config.security.require_basic_auth:
@@ -170,7 +253,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     @require_auth
     def index() -> str:
         ctx = get_context()
-        state = ctx.narrative_state.snapshot()
+        state = ctx.state_snapshot()
         return render_template(
             "index.html",
             state=state,
@@ -184,7 +267,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         ctx = get_context()
         pack = ctx.current_pack
         nodes = pack.nodes if pack else {}
-        health = ctx.health_snapshot
+        health = ctx.health_snapshot()
         assignments: dict[str, MediaAsset] = {}
         if pack:
             for (node_id, lang), asset in pack.media.items():
@@ -233,31 +316,31 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     @require_auth
     def analytics() -> str:
         ctx = get_context()
-        state = ctx.narrative_state.snapshot()
+        state = ctx.state_snapshot()
         return render_template(
             "analytics.html",
             state=state,
-            health=ctx.health_snapshot,
+            health=ctx.health_snapshot(),
         )
 
     @app.route("/api/health")
     @require_auth
     def api_health() -> Response:
         ctx = get_context()
-        return jsonify({"nodes": ctx.health_snapshot})
+        return jsonify({"nodes": ctx.health_snapshot()})
 
     @app.route("/api/state")
     @require_auth
     def api_state() -> Response:
         ctx = get_context()
-        return jsonify(ctx.narrative_state.snapshot())
+        return jsonify(ctx.state_snapshot())
 
     @app.route("/api/reset-state", methods=["POST"])
     @require_auth
     def api_reset_state() -> Response:
         ctx = get_context()
-        ctx.narrative_state.reset()
-        return jsonify({"ok": True, "state": ctx.narrative_state.snapshot()})
+        snapshot = ctx.reset_state()
+        return jsonify({"ok": True, "state": snapshot})
 
     @app.route("/api/push-config", methods=["POST"])
     @require_auth
@@ -269,10 +352,15 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         if not isinstance(payload, dict):
             abort(400, description="payload must be an object")
         app.logger.info("Configuration push requested for %s: %s", node_id, payload)
-        acknowledged = ctx.push_config_to_node(node_id, payload)
+        try:
+            acknowledged = ctx.push_config_to_node(node_id, payload)
+        except ConfigPushError as exc:
+            app.logger.warning("Configuration push to %s failed: %s", node_id, exc)
+            abort(getattr(exc, "status_code", 409), description=str(exc))
         return jsonify({"ok": acknowledged, "acknowledged": acknowledged, "node_id": node_id})
 
     @app.route("/api/apply-preset", methods=["POST"])
+    @app.route("/api/apply_preset", methods=["POST"])
     @require_auth
     def api_apply_preset() -> Response:
         ctx = get_context()
@@ -293,6 +381,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         else:
             abort(400, description="Provide preset_name or global settings to apply.")
 
+        ensure_quiet_hours_valid(profiles.setdefault("global", {}).get("quiet_hours"))
         save_profiles(profiles, ACCESSIBILITY_PATH)
         ctx.reload_accessibility()
         push_results = ctx.push_accessibility_configs()
