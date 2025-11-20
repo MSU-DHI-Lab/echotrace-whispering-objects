@@ -208,7 +208,12 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     def get_context() -> DashboardContext:
         return cast(DashboardContext, app.config["DASHBOARD_CONTEXT"])
 
-    route_return = Response | str | tuple[Response, int] | tuple[Response, int, dict[str, Any]]
+    route_return = (
+        WerkzeugResponse
+        | str
+        | tuple[WerkzeugResponse, int]
+        | tuple[WerkzeugResponse, int, dict[str, Any]]
+    )
     F = TypeVar("F", bound=Callable[..., route_return])
 
     def require_auth(func: F) -> F:
@@ -458,7 +463,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         )
 
     @app.route("/transcripts/<pack_name>/<path:filename>")
-    def serve_transcript(pack_name: str, filename: str) -> Response:
+    def serve_transcript(pack_name: str, filename: str) -> WerkzeugResponse:
         if Path(filename).suffix.lower() != ".html":
             abort(404)
         base_dir = (Path("content-packs") / pack_name / "transcripts").resolve()
@@ -467,14 +472,14 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
             abort(404)
         if not target_path.exists():
             abort(404)
-        return send_file(target_path, mimetype="text/html")
+        return cast(WerkzeugResponse, send_file(target_path, mimetype="text/html"))
 
     @app.route("/logout")
     @require_auth
-    def logout() -> Response:
+    def logout() -> WerkzeugResponse:
         response = redirect(url_for("index"))
         response.headers["WWW-Authenticate"] = 'Basic realm="EchoTrace"'
-        return response
+        return cast(WerkzeugResponse, response)
 
     return app
 
