@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING
 
 try:  # pragma: no cover - executed when gpiozero is installed
     from gpiozero import PWMLED as _PWMLED  # type: ignore[import]
@@ -11,31 +11,49 @@ except ImportError:  # pragma: no cover - executed in test/mock environments
     _PWMLED = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
-    from gpiozero import PWMLED as PWMLEDType  # type: ignore[import]
+    from gpiozero import PWMLED as _GPIOPWMLED  # type: ignore[import]
 else:
-
-    class PWMLEDType:  # type: ignore[too-many-instance-attributes]
-        """Very small fallback implementation for environments without gpiozero."""
-
-        def __init__(self, pin: int, frequency: int | None = None) -> None:  # noqa: D401
-            self.pin = pin
-            self.frequency = frequency
-            self.value = 0.0
-
-        def pulse(self, fade_in_time: float, fade_out_time: float) -> None:
-            self.value = 0.5
-
-        def blink(self, on_time: float, off_time: float) -> None:
-            self.value = 0.5
-
-        def off(self) -> None:
-            self.value = 0.0
-
-        def close(self) -> None:
-            self.off()
+    _GPIOPWMLED = None
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _LEDProtocol(Protocol):
+    value: float
+
+    def pulse(self, fade_in_time: float, fade_out_time: float) -> None:
+        ...
+
+    def blink(self, on_time: float, off_time: float) -> None:
+        ...
+
+    def off(self) -> None:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
+class _FallbackPWMLED:
+    """Very small fallback implementation for environments without gpiozero."""
+
+    def __init__(self, pin: int, frequency: int | None = None) -> None:  # noqa: D401
+        self.pin = pin
+        self.frequency = frequency
+        self.value = 0.0
+
+    def pulse(self, fade_in_time: float, fade_out_time: float) -> None:
+        self.value = 0.5
+
+    def blink(self, on_time: float, off_time: float) -> None:
+        self.value = 0.5
+
+    def off(self) -> None:
+        self.value = 0.0
+
+    def close(self) -> None:
+        self.off()
 
 
 class LedFeedback:
@@ -43,9 +61,9 @@ class LedFeedback:
 
     def __init__(self, pin: int, frequency: int = 100) -> None:
         if _PWMLED is not None:
-            self._led: PWMLEDAlias = _PWMLED(pin, frequency=frequency)
+            self._led: _LEDProtocol = _PWMLED(pin, frequency=frequency)
         else:
-            self._led = PWMLEDAlias(pin, frequency=frequency)
+            self._led = _FallbackPWMLED(pin, frequency=frequency)
         LOGGER.debug("LedFeedback initialised on pin %s", pin)
 
     def glow(self, level: float) -> None:
