@@ -387,7 +387,10 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         else:
             abort(400, description="Provide preset_name or global settings to apply.")
 
-        ensure_quiet_hours_valid(profiles.setdefault("global", {}).get("quiet_hours"))
+        try:
+            ensure_quiet_hours_valid(profiles.setdefault("global", {}).get("quiet_hours"))
+        except ValueError as exc:
+            abort(400, description=str(exc))
         save_profiles(profiles, ACCESSIBILITY_PATH)
         ctx.reload_accessibility()
         push_results = ctx.push_accessibility_configs()

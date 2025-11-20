@@ -210,7 +210,16 @@ def test_mystery_node_plays_on_unlock(tmp_path: Path) -> None:
     """Mystery nodes play finale audio when the hub publishes an unlocked state."""
     audio_file = tmp_path / "finale.mp3"
     audio_file.write_text("dummy", encoding="utf-8")
-    config_path = _write_config(tmp_path, {"role": "mystery"})
+    config_path = _write_config(
+        tmp_path,
+        {
+            "role": "mystery",
+            "audio": {
+                "fragment_file": str(audio_file),
+                "volume": 0.6,
+            },
+        },
+    )
 
     mqtt_client = FakeMQTT()
     audio = DummyAudio()
