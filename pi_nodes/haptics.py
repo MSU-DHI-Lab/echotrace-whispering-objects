@@ -43,7 +43,10 @@ class Haptics:
 
     def __init__(self, pin: int, active_high: bool = True) -> None:
         if DigitalOutputDevice is not None:
-            self._device: DigitalOutputDeviceTyped = DigitalOutputDevice(pin, active_high=active_high)
+            self._device: DigitalOutputDeviceTyped = DigitalOutputDevice(
+                pin,
+                active_high=active_high,
+            )
         else:
             self._device = DigitalOutputDeviceTyped(pin, active_high=active_high)
         LOGGER.debug("Haptics initialised on pin %s", pin)

@@ -22,13 +22,13 @@ def test_make_paced_copy_creates_and_cleans(tmp_path: Path) -> None:
     _write_wav(wav_path)
 
     player = AudioPlayer()
-    player._loaded_path = wav_path  # type: ignore[attr-defined]
+    player.load(wav_path)
 
     paced = player._make_paced_copy(0.9)
     assert paced is not None
     assert paced.exists()
 
-    player._cleanup_temp_audio()
+    AudioPlayer.cleanup_temp_file(paced)
     assert not paced.exists()
 
 
@@ -38,6 +38,6 @@ def test_make_paced_copy_ignored_for_non_wav(tmp_path: Path) -> None:
     mp3_path.write_bytes(b"dummy")
 
     player = AudioPlayer()
-    player._loaded_path = mp3_path  # type: ignore[attr-defined]
+    player.load(mp3_path)
 
     assert player._make_paced_copy(0.9) is None

@@ -24,7 +24,10 @@ def load_profiles(path: Path | None = None) -> dict[str, Any]:
     data.setdefault("global", {})
     data.setdefault("presets", {})
     data.setdefault("per_node_overrides", {})
-    ensure_quiet_hours_valid(data["global"].get("quiet_hours"))
+    try:
+        ensure_quiet_hours_valid(data["global"].get("quiet_hours"))
+    except ValueError as exc:
+        raise ValueError(f"Invalid quiet_hours configuration: {exc}") from exc
     return data
 
 
@@ -220,7 +223,14 @@ def _coerce_quiet_hour_entries(value: Any) -> list[str]:
         candidates = [str(item) for item in value]
     else:
         raise ValueError("quiet_hours must be provided as a string or list.")
-    return [entry.strip() for entry in candidates if entry and entry.strip()]
+    entries: list[str] = []
+    for entry in candidates:
+        if not isinstance(entry, str):
+            raise ValueError("quiet_hours entries must be strings.")
+        stripped = entry.strip()
+        if stripped:
+            entries.append(stripped)
+    return entries
 
 
 def ensure_quiet_hours_valid(value: Any) -> None:

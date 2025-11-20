@@ -43,7 +43,7 @@ Refer to `fabrication/wiring_fritzing.png` for a starter schematic. Adapt the la
 2. Enable SSH (`sudo raspi-config` → Interface Options → SSH) for remote updates.
 3. On the hub, install Mosquitto (`sudo apt install mosquitto mosquitto-clients`).
 4. Clone this repository into `/opt/echotrace` on the hub and `/opt/echotrace-node` on each node.
-5. Create a Python virtual environment and install dependencies: `python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt`.
+5. Create a Python virtual environment and install dependencies: `python3 -m venv .venv && . .venv/bin/activate && make install` (or `pip install -r requirements.txt -r requirements-dev.txt`).
 6. Review `hub/config.yaml` and each node’s `pi_nodes/node_config.yaml` to ensure broker hostnames, node IDs, and audio file paths are correct.
 
 ## Enabling Services

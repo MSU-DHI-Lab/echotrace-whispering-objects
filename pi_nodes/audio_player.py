@@ -7,7 +7,6 @@ import tempfile
 import wave
 import logging
 from pathlib import Path
-from threading import Lock
 from typing import Optional
 
 try:  # pragma: no cover - executed when pygame is available
@@ -24,8 +23,6 @@ class AudioPlayer:
 
     def __init__(self) -> None:
         self._loaded_path: Optional[Path] = None
-        self._temp_audio: Optional[Path] = None
-        self._temp_lock = Lock()
         self._safety_limit: float = 1.0
         self._mixer_available = mixer is not None
         if self._mixer_available and not mixer.get_init():  # type: ignore[union-attr]
@@ -38,7 +35,6 @@ class AudioPlayer:
 
     def load(self, path: Path) -> None:
         """Store the path to the audio file to be played later."""
-        self._cleanup_temp_audio()
         self._loaded_path = path
         LOGGER.debug("Audio fragment ready: %s", path)
 
@@ -68,8 +64,12 @@ class AudioPlayer:
         if not self._mixer_available or mixer is None:
             LOGGER.info("Play request for %s ignored; mixer unavailable.", self._loaded_path)
             return
-        target = self._select_playback_source(pace)
-        temp_source = self._temp_audio if self._temp_audio and target == self._temp_audio else None
+        temp_path: Optional[Path] = None
+        target = self._loaded_path
+        if abs(pace - 1.0) >= 0.02:
+            temp_path = self._make_paced_copy(pace)
+            if temp_path:
+                target = temp_path
         loops = repeat if repeat > 0 else (-1 if loop else 0)
         try:
             mixer.music.load(str(target))  # type: ignore[union-attr]
@@ -83,8 +83,8 @@ class AudioPlayer:
         except Exception as exc:  # pragma: no cover
             LOGGER.error("Failed to play audio %s: %s", self._loaded_path, exc)
         finally:
-            if temp_source is not None:
-                self._cleanup_temp_audio()
+            if temp_path:
+                self.cleanup_temp_file(temp_path)
 
     def stop(self) -> None:
         """Stop playback when supported."""
@@ -92,17 +92,6 @@ class AudioPlayer:
             LOGGER.debug("Stop request ignored; mixer unavailable.")
             return
         mixer.music.stop()  # type: ignore[union-attr]
-
-    def _select_playback_source(self, pace: float) -> Path:
-        """Return the audio path to use, transforming it when pace changes."""
-        if self._loaded_path is None:
-            raise RuntimeError("Audio fragment not loaded.")
-        if not self._mixer_available or abs(pace - 1.0) < 0.02:
-            return self._loaded_path
-        paced = self._make_paced_copy(pace)
-        if paced is None:
-            return self._loaded_path
-        return paced
 
     def _make_paced_copy(self, pace: float) -> Optional[Path]:
         """Create a temporary WAV with modified sample rate to adjust playback."""
@@ -113,7 +102,6 @@ class AudioPlayer:
                 self._loaded_path,
             )
             return None
-        self._cleanup_temp_audio()
         fd, temp_name = tempfile.mkstemp(prefix="echotrace_paced_", suffix=".wav")
         os.close(fd)
         temp_path = Path(temp_name)
@@ -131,21 +119,14 @@ class AudioPlayer:
             LOGGER.warning("Unable to prepare paced audio for %s: %s", self._loaded_path, exc)
             temp_path.unlink(missing_ok=True)
             return None
-        with self._temp_lock:
-            self._temp_audio = temp_path
         return temp_path
 
-    def _cleanup_temp_audio(self) -> None:
-        """Remove any generated paced audio clip."""
-        with self._temp_lock:
-            if self._temp_audio is None:
-                return
-            target = self._temp_audio
-            self._temp_audio = None
+    @staticmethod
+    def cleanup_temp_file(path: Path) -> None:
         try:
-            target.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
         except OSError:
-            LOGGER.debug("Failed to remove temporary paced audio %s", target)
+            LOGGER.debug("Failed to remove temporary paced audio %s", path)
 
     def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
         self._cleanup_temp_audio()

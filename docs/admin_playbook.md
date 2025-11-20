@@ -48,7 +48,7 @@ This playbook outlines daily routines, accessibility management, troubleshooting
 
 1. Stop services: `sudo systemctl stop echotrace-hub echotrace-node` on each device.
 2. Copy `/opt/echotrace` (hub) or `/opt/echotrace-node` (node) to an external drive.
-3. Restore by copying the directories back, reinstalling Python dependencies (`pip install -r requirements.txt`), and re-enabling services.
+3. Restore by copying the directories back, reinstalling Python dependencies (`make install` or `pip install -r requirements.txt -r requirements-dev.txt`), and re-enabling services.
 
 ## Security & Privacy
 

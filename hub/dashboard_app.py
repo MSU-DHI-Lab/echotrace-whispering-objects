@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional, Protocol, TypeVar, Union, cast
+from typing import Any, Callable, Optional, Protocol, TypeVar, cast
 
 from flask import (
     Flask,
@@ -62,7 +62,7 @@ class InProcessHubController:
 
     def push_node_config(self, node_id: str, payload: dict[str, Any]) -> bool:  # pragma: no cover
         logging.getLogger(__name__).debug(
-            "In-process hub controller received push for %s: %s", node_id, payload
+            "In-process hub controller received push to %s: %s", node_id, payload
         )
         return True
 
@@ -85,8 +85,6 @@ class DashboardContext:
     accessibility: dict[str, Any]
     current_pack: ContentPack | None = None
     hub_controller: HubControllerProtocol | None = None
-    _last_state: dict[str, Any] = field(default_factory=dict)
-    _last_health: dict[str, float] = field(default_factory=dict)
 
     def select_pack(self, pack_name: str) -> ContentPack:
         pack = self.content_manager.load_pack(pack_name)
@@ -123,30 +121,26 @@ class DashboardContext:
     def state_snapshot(self) -> dict[str, Any]:
         controller = self.hub_controller
         if controller is None:
-            return dict(self._last_state)
+            return {}
         try:
-            snapshot = dict(controller.get_state_snapshot())
-            self._last_state = snapshot
-            return snapshot
+            return dict(controller.get_state_snapshot())
         except Exception as exc:  # pragma: no cover - defensive logging
             logging.getLogger(__name__).warning(
                 "Failed to pull state snapshot from hub controller: %s", exc
             )
-            return dict(self._last_state)
+            return {}
 
     def health_snapshot(self) -> dict[str, float]:
         controller = self.hub_controller
         if controller is None:
-            return dict(self._last_health)
+            return {}
         try:
-            snapshot = dict(controller.get_health_snapshot())
-            self._last_health = snapshot
-            return snapshot
+            return dict(controller.get_health_snapshot())
         except Exception as exc:  # pragma: no cover - defensive logging
             logging.getLogger(__name__).warning(
                 "Failed to pull health snapshot from hub controller: %s", exc
             )
-            return dict(self._last_health)
+            return {}
 
     def reset_state(self) -> dict[str, Any]:
         controller = self.hub_controller
@@ -172,7 +166,11 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         static_folder=str(Path(__file__).resolve().parent / "static"),
     )
 
-    accessibility = load_profiles(ACCESSIBILITY_PATH)
+    try:
+        accessibility = load_profiles(ACCESSIBILITY_PATH)
+    except ValueError as exc:
+        app.logger.warning("Falling back to default accessibility profiles: %s", exc)
+        accessibility = {"global": {}, "presets": {}, "per_node_overrides": {}}
     narrative_state = NarrativeState(
         required_fragments=hub_config.narrative.required_fragments_to_unlock
     )
@@ -183,6 +181,8 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         content_manager=ContentManager(),
         accessibility=accessibility,
         hub_controller=controller,
+        _last_state=dict(controller.get_state_snapshot()),
+        _last_health=dict(controller.get_health_snapshot()),
     )
 
     available_packs = context.content_manager.list_packs()
@@ -209,8 +209,8 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     def get_context() -> DashboardContext:
         return cast(DashboardContext, app.config["DASHBOARD_CONTEXT"])
 
-    RouteReturn = Response | str | tuple[Response, int] | tuple[Response, int, dict[str, Any]]
-    F = TypeVar("F", bound=Callable[..., RouteReturn])
+    route_return = Response | str | tuple[Response, int] | tuple[Response, int, dict[str, Any]]
+    F = TypeVar("F", bound=Callable[..., route_return])
 
     def require_auth(func: F) -> F:
         @functools.wraps(func)
