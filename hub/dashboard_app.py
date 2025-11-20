@@ -6,7 +6,7 @@ import functools
 import hmac
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, TypeVar, cast
 
@@ -214,7 +214,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
 
     def require_auth(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> RouteReturn:
+        def wrapper(*args: Any, **kwargs: Any) -> route_return:
             expected = cast(Optional[tuple[str, str]], app.config.get("ADMIN_CREDENTIALS"))
             if not expected:
                 return func(*args, **kwargs)
@@ -493,10 +493,10 @@ def _require_json(req: Request) -> dict[str, Any]:
     return data
 
 
-def _require_field(data: dict[str, Any], field: str) -> str:
-    value = data.get(field)
+def _require_field(data: dict[str, Any], field_name: str) -> str:
+    value = data.get(field_name)
     if not value or not isinstance(value, str):
-        abort(400, description=f"Field '{field}' is required.")
+        abort(400, description=f"Field '{field_name}' is required.")
     assert isinstance(value, str)
     return value
 

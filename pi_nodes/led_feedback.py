@@ -6,9 +6,9 @@ import logging
 from typing import TYPE_CHECKING
 
 try:  # pragma: no cover - executed when gpiozero is installed
-    from gpiozero import PWMLED as PWMLED  # type: ignore[import]
+    from gpiozero import PWMLED as _PWMLED  # type: ignore[import]
 except ImportError:  # pragma: no cover - executed in test/mock environments
-    PWMLED = None  # type: ignore[assignment]
+    _PWMLED = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
     from gpiozero import PWMLED as PWMLEDType  # type: ignore[import]
@@ -42,8 +42,8 @@ class LedFeedback:
     """Simple wrapper around PWMLED supporting glow, blink, and off states."""
 
     def __init__(self, pin: int, frequency: int = 100) -> None:
-        if PWMLED is not None:
-            self._led: PWMLEDType = PWMLED(pin, frequency=frequency)
+        if _PWMLED is not None:
+            self._led: PWMLEDType = _PWMLED(pin, frequency=frequency)
         else:
             self._led = PWMLEDType(pin, frequency=frequency)
         LOGGER.debug("LedFeedback initialised on pin %s", pin)
