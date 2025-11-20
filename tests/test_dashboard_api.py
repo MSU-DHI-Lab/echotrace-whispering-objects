@@ -12,6 +12,7 @@ import yaml  # type: ignore[import]
 
 from hub.hub_listener import ConfigPushError
 
+
 class FakeHubController:
     """Capture configuration pushes without requiring a live broker."""
 
