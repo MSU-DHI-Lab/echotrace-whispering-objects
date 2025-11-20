@@ -181,8 +181,6 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
         content_manager=ContentManager(),
         accessibility=accessibility,
         hub_controller=controller,
-        _last_state=dict(controller.get_state_snapshot()),
-        _last_health=dict(controller.get_health_snapshot()),
     )
 
     available_packs = context.content_manager.list_packs()
@@ -221,9 +219,11 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
             auth = request.authorization
             if not auth:
                 return _auth_required_response()
+            provided_user = auth.username or ""
+            provided_pass = auth.password or ""
             if not (
-                hmac.compare_digest(auth.username, expected[0])
-                and hmac.compare_digest(auth.password, expected[1])
+                hmac.compare_digest(provided_user, expected[0])
+                and hmac.compare_digest(provided_pass, expected[1])
             ):
                 return _auth_required_response()
             return func(*args, **kwargs)
@@ -481,7 +481,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
 def _auth_required_response() -> Response:
     response = Response(status=401)
     response.headers["WWW-Authenticate"] = 'Basic realm="EchoTrace"'
-    return response
+    return cast(Response, response)
 
 
 def _require_json(req: Request) -> dict[str, Any]:

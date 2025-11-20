@@ -128,8 +128,5 @@ class AudioPlayer:
         except OSError:
             LOGGER.debug("Failed to remove temporary paced audio %s", path)
 
-    def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
-        self._cleanup_temp_audio()
-
 
 __all__ = ["AudioPlayer"]

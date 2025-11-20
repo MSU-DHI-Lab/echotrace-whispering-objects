@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, cast
 
 import pytest
 
@@ -136,9 +136,9 @@ def test_node_service_emits_heartbeat(tmp_path: Path) -> None:
     service = NodeService(
         config_path=config_path,
         sensor=MockProximitySensor([900]),
-        audio_player=audio,
-        led_feedback=DummyLED(),
-        haptics=DummyHaptics(),
+        audio_player=cast(Any, audio),
+        led_feedback=cast(Any, DummyLED()),
+        haptics=cast(Any, DummyHaptics()),
         mqtt_client=mqtt_client,
     )
 
@@ -162,9 +162,9 @@ def test_whisper_node_triggers_story(tmp_path: Path) -> None:
     service = NodeService(
         config_path=config_path,
         sensor=sensor,
-        audio_player=audio,
-        led_feedback=led,
-        haptics=DummyHaptics(),
+        audio_player=cast(Any, audio),
+        led_feedback=cast(Any, led),
+        haptics=cast(Any, DummyHaptics()),
         mqtt_client=mqtt_client,
     )
 
@@ -187,9 +187,9 @@ def test_config_update_applies_and_acknowledges(tmp_path: Path) -> None:
     service = NodeService(
         config_path=config_path,
         sensor=MockProximitySensor([900]),
-        audio_player=audio,
-        led_feedback=DummyLED(),
-        haptics=DummyHaptics(),
+        audio_player=cast(Any, audio),
+        led_feedback=cast(Any, DummyLED()),
+        haptics=cast(Any, DummyHaptics()),
         mqtt_client=mqtt_client,
     )
 
@@ -212,9 +212,9 @@ def test_mystery_node_plays_on_unlock(tmp_path: Path) -> None:
     service = NodeService(
         config_path=config_path,
         sensor=MockProximitySensor([900]),
-        audio_player=audio,
-        led_feedback=DummyLED(),
-        haptics=DummyHaptics(),
+        audio_player=cast(Any, audio),
+        led_feedback=cast(Any, DummyLED()),
+        haptics=cast(Any, DummyHaptics()),
         mqtt_client=mqtt_client,
     )
 

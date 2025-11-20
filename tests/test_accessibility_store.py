@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,7 +22,7 @@ def test_quiet_hours_dim_output() -> None:
         },
         "per_node_overrides": {},
     }
-    nodes = {"object1": {}}
+    nodes: dict[str, dict[str, Any]] = {"object1": {}}
 
     payloads = derive_runtime_payloads(
         profiles,
@@ -46,7 +47,7 @@ def test_quiet_hours_respect_explicit_overrides() -> None:
             "object1": {"visual_pulse": True, "proximity_glow": True},
         },
     }
-    nodes = {"object1": {}}
+    nodes: dict[str, dict[str, Any]] = {"object1": {}}
 
     payloads = derive_runtime_payloads(
         profiles,

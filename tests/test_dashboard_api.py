@@ -5,10 +5,12 @@ from __future__ import annotations
 import base64
 import os
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Iterator, Tuple
 
 import pytest
 import yaml  # type: ignore[import]
+
+from flask.testing import FlaskClient
 
 from hub.hub_listener import ConfigPushError
 
@@ -44,7 +46,10 @@ def _auth_header() -> dict[str, str]:
 
 
 @pytest.fixture()
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def client(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[FlaskClient, FakeHubController, Path]]:
     os.environ.setdefault("ECHOTRACE_ADMIN_USER", "admin")
     os.environ.setdefault("ECHOTRACE_ADMIN_PASS", "secret")
 
@@ -69,7 +74,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         yield testing_client, controller, cloned_path
 
 
-def test_overview_requires_auth(client) -> None:
+def test_overview_requires_auth(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Ensure unauthenticated access is blocked."""
     testing_client, _controller, _path = client
     response = testing_client.get("/")
@@ -80,7 +87,9 @@ def test_overview_requires_auth(client) -> None:
     assert b"Installation Snapshot" in authed.data
 
 
-def test_api_state_and_reset(client) -> None:
+def test_api_state_and_reset(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Check narrative state JSON surfaces and resets."""
     testing_client, _controller, _path = client
     state_resp = testing_client.get("/api/state", headers=_auth_header())
@@ -95,7 +104,9 @@ def test_api_state_and_reset(client) -> None:
     assert reset_payload["ok"] is True
 
 
-def test_apply_preset_triggers_push(client) -> None:
+def test_apply_preset_triggers_push(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Applying a preset should broadcast accessibility updates to nodes."""
     testing_client, controller, _path = client
     controller.calls.clear()
@@ -111,7 +122,9 @@ def test_apply_preset_triggers_push(client) -> None:
     assert "object1" in data["push"]
 
 
-def test_push_config_conflict_returns_error(client) -> None:
+def test_push_config_conflict_returns_error(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Conflicting config pushes should return HTTP 409."""
     testing_client, controller, _path = client
     controller.error = ConfigPushError("already busy", status_code=409)
@@ -124,7 +137,9 @@ def test_push_config_conflict_returns_error(client) -> None:
     controller.error = None
 
 
-def test_invalid_quiet_hours_rejected(client) -> None:
+def test_invalid_quiet_hours_rejected(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Invalid quiet hour entries should return 400."""
     testing_client, _controller, _path = client
     response = testing_client.post(
@@ -135,7 +150,9 @@ def test_invalid_quiet_hours_rejected(client) -> None:
     assert response.status_code == 400
 
 
-def test_set_per_node_override_updates_yaml(client) -> None:
+def test_set_per_node_override_updates_yaml(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Per-node overrides should persist and trigger config pushes."""
     testing_client, controller, profiles_path = client
     controller.calls.clear()
@@ -159,7 +176,9 @@ def test_set_per_node_override_updates_yaml(client) -> None:
     assert stored["per_node_overrides"]["object1"]["visual_pulse"] is True
 
 
-def test_analytics_summary_no_data(client) -> None:
+def test_analytics_summary_no_data(
+    client: tuple[FlaskClient, FakeHubController, Path]
+) -> None:
     """Analytics summary should report lack of data gracefully."""
     testing_client, _controller, _path = client
     response = testing_client.get("/api/analytics/summary", headers=_auth_header())
