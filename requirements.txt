@@ -1,10 +1,10 @@
-Flask>=2.3
+Flask>=2.2
 paho-mqtt>=1.6
 gpiozero>=1.6
 pygame>=2.5
 PyYAML>=6.0
 Jinja2>=3.1
-python-dotenv>=1.0
+python-dotenv>=0.21.0
 waitress>=2.1
-typing-extensions>=4.9
+typing-extensions>=4.0
 schedule>=1.2

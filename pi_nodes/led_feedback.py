@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from typing_extensions import Protocol
 
 try:  # pragma: no cover - executed when gpiozero is installed
     from gpiozero import PWMLED as _PWMLED  # type: ignore[import]

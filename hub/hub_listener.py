@@ -8,7 +8,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 try:  # pragma: no cover - executed when paho-mqtt is installed
     import paho.mqtt.client as mqtt
@@ -48,18 +48,23 @@ class HubRuntimeState:
     """In-memory snapshot of hub observability data."""
 
     last_seen: Dict[str, datetime] = field(default_factory=dict)
+    telemetry: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
-    def update_health(self, node_id: str, timestamp: datetime) -> None:
+    def update_health(self, node_id: str, timestamp: datetime, extra: Dict[str, Any]) -> None:
         """Record the last time a heartbeat was observed for a node."""
         self.last_seen[node_id] = timestamp
+        self.telemetry[node_id] = extra
 
-    def snapshot(self) -> Dict[str, float]:
-        """Return seconds elapsed since the last heartbeat per node."""
+    def snapshot(self) -> Dict[str, Dict[str, Any]]:
+        """Return status snapshot per node."""
         now = datetime.now(tz=timezone.utc)
-        return {
-            node_id: (now - seen).total_seconds()
-            for node_id, seen in self.last_seen.items()
-        }
+        result = {}
+        for node_id, seen in self.last_seen.items():
+            result[node_id] = {
+                "age": (now - seen).total_seconds(),
+                **self.telemetry.get(node_id, {}),
+            }
+        return result
 
 
 class HubListener:
@@ -67,7 +72,7 @@ class HubListener:
 
     def __init__(
         self,
-        config: HubConfig | None = None,
+        config: Optional[HubConfig] = None,
         mqtt_client: Optional[mqtt.Client] = None,
     ) -> None:
         if mqtt is None:
@@ -76,6 +81,7 @@ class HubListener:
         self._config = config or load_config()
         self._client = mqtt_client or mqtt.Client()
         self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
 
         self._runtime = HubRuntimeState()
@@ -168,7 +174,7 @@ class HubListener:
         """Return the current narrative state snapshot."""
         return self._narrative.snapshot()
 
-    def get_health_snapshot(self) -> Dict[str, float]:
+    def get_health_snapshot(self) -> Dict[str, Dict[str, Any]]:
         """Return ages of the last heartbeat received per node."""
         return self._runtime.snapshot()
 
@@ -197,6 +203,17 @@ class HubListener:
         client.subscribe(health_wildcard())
         client.subscribe(trigger_wildcard())
         client.subscribe(ack_wildcard())
+
+    def _on_disconnect(
+        self,
+        client: mqtt.Client,
+        _userdata: object,
+        rc: int,
+    ) -> None:
+        if rc != 0:
+            LOGGER.warning("Unexpected disconnection from MQTT broker (rc=%s).", rc)
+        else:
+            LOGGER.info("Disconnected from MQTT broker.")
 
     def _on_message(
         self,
@@ -230,7 +247,13 @@ class HubListener:
             self._event_logger.record_event("heartbeat_received", node_id, "invalid_json")
             return
 
-        self._runtime.update_health(node_id, timestamp)
+            return
+
+        extra = {
+            "rssi": data.get("rssi", 0),
+            "sensor_status": data.get("sensor_status", "unknown"),
+        }
+        self._runtime.update_health(node_id, timestamp, extra)
         self._event_logger.record_event("heartbeat_received", node_id, payload or "{}")
 
     def _handle_trigger(self, node_id: str, payload: str) -> None:

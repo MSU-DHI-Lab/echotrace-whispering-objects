@@ -80,8 +80,23 @@ class ContentManager:
         base_url = f"{self._transcripts_base}/{name}"
 
         pack = ContentPack(name=name, root=pack_path, nodes=nodes, media=media, base_url=base_url)
+        self._validate_pack_integrity(pack)
         self._active_pack = pack
         return pack
+
+    def _validate_pack_integrity(self, pack: ContentPack) -> None:
+        """Check that all referenced assets exist on disk."""
+        missing = []
+        for (node_id, lang), asset in pack.media.items():
+            if not asset.audio_path.exists():
+                missing.append(f"{node_id}/{lang}: audio {asset.audio_path.name}")
+            if not asset.transcript_path.exists():
+                missing.append(f"{node_id}/{lang}: transcript {asset.transcript_path.name}")
+
+        if missing:
+            LOGGER.error("Content pack '%s' has missing assets:\n  - %s", pack.name, "\n  - ".join(missing))
+        else:
+            LOGGER.info("Content pack '%s' integrity check passed.", pack.name)
 
     def get_fragment_for_node(self, node_id: str, language: str) -> Path | None:
         """Return the audio fragment path for a given node and language."""

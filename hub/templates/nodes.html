@@ -10,6 +10,8 @@
                     <th>Role</th>
                     <th>Default Language</th>
                     <th>Last Heartbeat (s)</th>
+                    <th>Signal (dBm)</th>
+                    <th>Sensor</th>
                     <th>Assigned Fragment</th>
                     <th>Actions</th>
                 </tr>
@@ -20,7 +22,9 @@
                         <td>{{ node_id }}</td>
                         <td>{{ meta.role }}</td>
                         <td>{{ meta.default_language }}</td>
-                        <td>{{ health.get(node_id, '—') }}</td>
+                        <td>{{ health.get(node_id, {}).get('age', '—')|round(1) }}</td>
+                        <td>{{ health.get(node_id, {}).get('rssi', '—') }}</td>
+                        <td>{{ health.get(node_id, {}).get('sensor_status', '—') }}</td>
                         <td>
                             {% set asset = assignments.get(node_id) %}
                             {% if asset %}

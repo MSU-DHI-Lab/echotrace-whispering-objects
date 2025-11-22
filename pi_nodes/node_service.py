@@ -528,6 +528,8 @@ class NodeService:
             "node_id": self.config.node_id,
             "role": self.config.role,
             "ts": now,
+            "rssi": self._get_rssi(),
+            "sensor_status": self._sensor.status,
         }
         message = json.dumps(payload)
         info = self._mqtt.publish(health_topic(self.config.node_id), message, qos=0)
@@ -535,6 +537,23 @@ class NodeService:
             LOGGER.warning("Heartbeat publish returned rc=%s", info.rc)
         self._last_heartbeat_ts = now
         return payload
+
+    def _get_rssi(self) -> int:
+        """Estimate Wi-Fi signal strength in dBm."""
+        try:
+            with open("/proc/net/wireless", "r", encoding="utf-8") as handle:
+                for line in handle:
+                    if "wlan0" in line or "wlan1" in line:
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            # The level is usually the 4th field (index 3)
+                            # Some drivers report it as a negative dBm value directly,
+                            # others as a positive quality value. We assume dBm if negative.
+                            val = float(parts[3].rstrip("."))
+                            return int(val) if val < 0 else int(val - 100)
+        except (FileNotFoundError, ValueError, IndexError):
+            pass
+        return 0
 
 
 def main() -> None:  # pragma: no cover - script entry point

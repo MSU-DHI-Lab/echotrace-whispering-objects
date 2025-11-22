@@ -117,14 +117,17 @@ class AudioPlayer:
                 dest.writeframes(frames)
         except (OSError, wave.Error) as exc:
             LOGGER.warning("Unable to prepare paced audio for %s: %s", self._loaded_path, exc)
-            temp_path.unlink(missing_ok=True)
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
             return None
         return temp_path
 
     @staticmethod
     def cleanup_temp_file(path: Path) -> None:
         try:
-            path.unlink(missing_ok=True)
+            path.unlink()
         except OSError:
             LOGGER.debug("Failed to remove temporary paced audio %s", path)
 

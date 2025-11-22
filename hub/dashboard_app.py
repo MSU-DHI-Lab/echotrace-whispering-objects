@@ -8,7 +8,8 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional, Protocol, TypeVar, cast
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
+from typing_extensions import Protocol
 
 from flask import (
     Flask,
@@ -50,7 +51,7 @@ class HubControllerProtocol(Protocol):
     def reset_state(self) -> None:
         ...
 
-    def get_health_snapshot(self) -> dict[str, float]:
+    def get_health_snapshot(self) -> dict[str, dict[str, Any]]:
         ...
 
 
@@ -59,7 +60,7 @@ class InProcessHubController:
 
     def __init__(self, narrative_state: NarrativeState) -> None:
         self._state = narrative_state
-        self._health: dict[str, float] = {}
+        self._health: dict[str, dict[str, Any]] = {}
 
     def push_node_config(self, node_id: str, payload: dict[str, Any]) -> bool:  # pragma: no cover
         logging.getLogger(__name__).debug(
@@ -73,7 +74,7 @@ class InProcessHubController:
     def reset_state(self) -> None:
         self._state.reset()
 
-    def get_health_snapshot(self) -> dict[str, float]:
+    def get_health_snapshot(self) -> dict[str, dict[str, Any]]:
         return dict(self._health)
 
 
@@ -131,7 +132,7 @@ class DashboardContext:
             )
             return {}
 
-    def health_snapshot(self) -> dict[str, float]:
+    def health_snapshot(self) -> dict[str, dict[str, Any]]:
         controller = self.hub_controller
         if controller is None:
             return {}
@@ -194,7 +195,7 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     app.config["DASHBOARD_CONTEXT"] = context
     app.config["HUB_CONTROLLER"] = controller
 
-    credentials: Optional[tuple[str, str]] = None
+    credentials: Optional[Tuple[str, str]] = None
     if hub_config.security.require_basic_auth:
         username = os.getenv(hub_config.security.admin_user_env)
         password = os.getenv(hub_config.security.admin_pass_env)
@@ -208,18 +209,18 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
     def get_context() -> DashboardContext:
         return cast(DashboardContext, app.config["DASHBOARD_CONTEXT"])
 
-    route_return = (
-        WerkzeugResponse
-        | str
-        | tuple[WerkzeugResponse, int]
-        | tuple[WerkzeugResponse, int, dict[str, Any]]
-    )
+    route_return = Union[
+        WerkzeugResponse,
+        str,
+        Tuple[WerkzeugResponse, int],
+        Tuple[WerkzeugResponse, int, Dict[str, Any]]
+    ]
     F = TypeVar("F", bound=Callable[..., route_return])
 
     def require_auth(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> route_return:
-            expected = cast(Optional[tuple[str, str]], app.config.get("ADMIN_CREDENTIALS"))
+            expected = cast(Optional[Tuple[str, str]], app.config.get("ADMIN_CREDENTIALS"))
             if not expected:
                 return func(*args, **kwargs)
             auth = request.authorization

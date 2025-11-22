@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+
+import fcntl
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +54,7 @@ class CsvEventLogger:
         """Close the current file handle, if any."""
         if self._file_obj:
             try:
+                fcntl.flock(self._file_obj, fcntl.LOCK_UN)
                 self._file_obj.close()
             except OSError:
                 LOGGER.debug("Failed to close event log file cleanly.", exc_info=True)
@@ -78,6 +81,10 @@ class CsvEventLogger:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_exists = file_path.exists()
             self._file_obj = file_path.open("a", encoding="utf-8", newline="")
+            try:
+                fcntl.flock(self._file_obj, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                LOGGER.warning("Could not acquire lock on log file %s", file_path)
             self._writer = csv.DictWriter(self._file_obj, fieldnames=CSV_COLUMNS)
             if not file_exists:
                 self._writer.writeheader()

@@ -41,6 +41,13 @@ class ProximitySensor:
             self._sensor = None
             LOGGER.warning("Failed to initialise VL53L1X sensor: %s", exc)
 
+    @property
+    def status(self) -> str:
+        """Return the current status of the sensor."""
+        if self._sensor is not None:
+            return "hardware"
+        return "fallback"
+
     def read_distance_mm(self) -> Optional[int]:
         """Return the measured distance in millimetres or a fallback value."""
         if self._sensor is None:
