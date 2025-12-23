@@ -9,7 +9,7 @@ import fcntl
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, TextIO
+from typing import Optional, TextIO
 
 
 LOGGER = logging.getLogger(__name__)
@@ -108,13 +108,13 @@ class CsvEventLogger:
 class AnalyticsSummary:
     """Aggregate interpretation-ready analytics metrics."""
 
-    by_node: Dict[str, int]
-    heartbeat_by_node: Dict[str, int]
+    by_node: dict[str, int]
+    heartbeat_by_node: dict[str, int]
     narrative_unlocks: int
     total_triggers: int
     completion_rate: float
     mean_trigger_interval_seconds: float
-    recent_events: List[Dict[str, str]]
+    recent_events: list[dict[str, str]]
 
 
 def summarize_events(logs_dir: Path) -> Optional[AnalyticsSummary]:
@@ -125,11 +125,11 @@ def summarize_events(logs_dir: Path) -> Optional[AnalyticsSummary]:
     if latest is None or not latest.exists():
         return None
 
-    by_node: Dict[str, int] = {}
-    heartbeat_by_node: Dict[str, int] = {}
+    by_node: dict[str, int] = {}
+    heartbeat_by_node: dict[str, int] = {}
     narrative_unlocks = 0
-    trigger_timestamps: List[dt.datetime] = []
-    recent_events: List[Dict[str, str]] = []
+    trigger_timestamps: list[dt.datetime] = []
+    recent_events: list[dict[str, str]] = []
 
     try:
         with latest.open("r", encoding="utf-8") as handle:

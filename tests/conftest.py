@@ -17,8 +17,11 @@ def mock_hardware_modules() -> Generator[None, None, None]:
     if "gpiozero" not in sys.modules:
         gpiozero = types.ModuleType("gpiozero")
 
-        class _PWMLED:  # type: ignore[too-many-instance-attributes]
-            def __init__(self, pin: int, frequency: int | None = None) -> None:  # noqa: D401
+        class _PWMLED:  # type: ignore[no-redef]
+            """Mock PWM LED for testing without hardware."""
+
+            def __init__(self, pin: int, frequency: int | None = None) -> None:
+                """Initialise the mock LED on the specified pin."""
                 self.pin = pin
                 self.frequency = frequency
                 self.value = 0.0
@@ -32,8 +35,11 @@ def mock_hardware_modules() -> Generator[None, None, None]:
             def close(self) -> None:
                 self.value = 0.0
 
-        class _DigitalOutputDevice:  # type: ignore[too-many-instance-attributes]
-            def __init__(self, pin: int, active_high: bool = True) -> None:  # noqa: D401
+        class _DigitalOutputDevice:  # type: ignore[no-redef]
+            """Mock digital output device for testing without hardware."""
+
+            def __init__(self, pin: int, active_high: bool = True) -> None:
+                """Initialise the mock device on the specified pin."""
                 self.pin = pin
                 self.active_high = active_high
                 self.state = False
@@ -43,7 +49,9 @@ def mock_hardware_modules() -> Generator[None, None, None]:
                 on_time: float,
                 off_time: float,
                 n: int | None = None,
-            ) -> None:  # noqa: ARG002
+            ) -> None:
+                """Simulate a blink pattern."""
+                del n  # Unused parameter
                 self.state = True
 
             def on(self) -> None:
@@ -64,13 +72,18 @@ def mock_hardware_modules() -> Generator[None, None, None]:
         pygame = types.ModuleType("pygame")
 
         class _Music:
+            """Mock music mixer for testing without pygame."""
+
             def __init__(self) -> None:
+                """Initialise the mock music mixer."""
                 self.volume = 1.0
 
-            def load(self, path: str) -> None:  # noqa: D401
+            def load(self, path: str) -> None:
+                """Record the loaded audio path."""
                 self.last_loaded = path
 
-            def play(self, loops: int = 0) -> None:  # noqa: D401, ARG002
+            def play(self, loops: int = 0) -> None:
+                """Simulate playback with the specified loop count."""
                 self.is_playing = loops
 
             def stop(self) -> None:

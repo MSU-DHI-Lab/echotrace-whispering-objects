@@ -468,13 +468,19 @@ def create_app(config: HubConfig | None = None, hub_controller: Any | None = Non
 
     @app.route("/transcripts/<pack_name>/<path:filename>")
     def serve_transcript(pack_name: str, filename: str) -> WerkzeugResponse:
+        # Validate pack_name contains no path separators
+        if "/" in pack_name or "\\" in pack_name or ".." in pack_name:
+            abort(404)
         if Path(filename).suffix.lower() != ".html":
             abort(404)
         base_dir = (Path("content-packs") / pack_name / "transcripts").resolve()
         target_path = (base_dir / filename).resolve()
-        if base_dir not in target_path.parents and target_path != base_dir:
+        # Ensure resolved path is strictly within the base directory
+        try:
+            target_path.relative_to(base_dir)
+        except ValueError:
             abort(404)
-        if not target_path.exists():
+        if not target_path.is_file():
             abort(404)
         return cast(WerkzeugResponse, send_file(target_path, mimetype="text/html"))
 
@@ -507,12 +513,15 @@ def _require_field(data: dict[str, Any], field_name: str) -> str:
     value = data.get(field_name)
     if not value or not isinstance(value, str):
         abort(400, description=f"Field '{field_name}' is required.")
-    assert isinstance(value, str)
     return value
 
 
-app: Flask = create_app()
-
-
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8080, debug=True)
+    # Development server entry point - not for production use.
+    # Production deployments should use run_hub.py with Waitress.
+    import os
+    os.environ.setdefault("ECHOTRACE_ADMIN_USER", "admin")
+    os.environ.setdefault("ECHOTRACE_ADMIN_PASS", "changeme")  # noqa: S105
+    development_app = create_app()
+    development_app.run(host="127.0.0.1", port=8080, debug=True)
+

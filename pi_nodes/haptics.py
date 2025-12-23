@@ -14,10 +14,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing aid only
     from gpiozero import DigitalOutputDevice as DigitalOutputDeviceTyped  # type: ignore[import]
 else:
 
-    class DigitalOutputDeviceTyped:  # type: ignore[too-many-instance-attributes]
+    class DigitalOutputDeviceTyped:  # type: ignore[no-redef]
         """Fallback implementation used when gpiozero is not available."""
 
-        def __init__(self, pin: int, active_high: bool = True) -> None:  # noqa: D401
+        def __init__(self, pin: int, active_high: bool = True) -> None:
+            """Initialise a fallback digital output device on the specified GPIO pin."""
             self.pin = pin
             self.state = False
             self.active_high = active_high

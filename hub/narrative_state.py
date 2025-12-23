@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
 
 
 @dataclass
@@ -11,7 +10,7 @@ class NarrativeState:
     """Track triggered fragments and whether the mystery narrative is unlocked."""
 
     required_fragments: int
-    triggered_whispers: Set[str] = field(default_factory=set)
+    triggered_whispers: set[str] = field(default_factory=set)
     unlocked: bool = False
 
     def register_trigger(self, node_id: str) -> bool:
@@ -32,14 +31,14 @@ class NarrativeState:
         self.triggered_whispers.clear()
         self.unlocked = False
 
-    def snapshot(self) -> Dict[str, object]:
+    def snapshot(self) -> dict[str, object]:
         """Return a serialisable view of the current narrative state."""
         return {
             "unlocked": self.unlocked,
             "triggered": self.triggered_list(),
         }
 
-    def triggered_list(self) -> List[str]:
+    def triggered_list(self) -> list[str]:
         """Expose the triggered whisper identifiers sorted for readability."""
         return sorted(self.triggered_whispers)
 

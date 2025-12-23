@@ -39,7 +39,8 @@ class _LEDProtocol(Protocol):
 class _FallbackPWMLED:
     """Very small fallback implementation for environments without gpiozero."""
 
-    def __init__(self, pin: int, frequency: int | None = None) -> None:  # noqa: D401
+    def __init__(self, pin: int, frequency: int | None = None) -> None:
+        """Initialise a fallback PWM LED on the specified GPIO pin."""
         self.pin = pin
         self.frequency = frequency
         self.value = 0.0

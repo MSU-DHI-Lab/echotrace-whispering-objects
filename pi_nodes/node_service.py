@@ -7,7 +7,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import yaml  # type: ignore[import]
 
@@ -54,7 +54,7 @@ class ProximitySettings:
     hysteresis_mm: int = 50
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ProximitySettings:
+    def from_dict(cls, data: dict[str, Any]) -> ProximitySettings:
         return cls(
             min_mm=int(data.get("min_mm", 100)),
             max_mm=int(data.get("max_mm", 1200)),
@@ -62,7 +62,7 @@ class ProximitySettings:
             hysteresis_mm=int(data.get("hysteresis_mm", 50)),
         )
 
-    def update(self, values: Dict[str, Any]) -> None:
+    def update(self, values: dict[str, Any]) -> None:
         for key in ("min_mm", "max_mm", "story_threshold_mm", "hysteresis_mm"):
             if key in values:
                 setattr(self, key, int(values[key]))
@@ -76,13 +76,13 @@ class AudioSettings:
     volume: float = 0.7
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AudioSettings:
+    def from_dict(cls, data: dict[str, Any]) -> AudioSettings:
         return cls(
             fragment_file=str(data.get("fragment_file", "")),
             volume=float(data.get("volume", 0.7)),
         )
 
-    def update(self, values: Dict[str, Any]) -> None:
+    def update(self, values: dict[str, Any]) -> None:
         if "fragment_file" in values:
             self.fragment_file = str(values["fragment_file"])
         if "volume" in values:
@@ -102,7 +102,7 @@ class AccessibilitySettings:
     safety_limiter: bool = True
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AccessibilitySettings:
+    def from_dict(cls, data: dict[str, Any]) -> AccessibilitySettings:
         return cls(
             captions=bool(data.get("captions", False)),
             visual_pulse=bool(data.get("visual_pulse", False)),
@@ -113,7 +113,7 @@ class AccessibilitySettings:
             safety_limiter=bool(data.get("safety_limiter", True)),
         )
 
-    def update(self, values: Dict[str, Any]) -> None:
+    def update(self, values: dict[str, Any]) -> None:
         if "captions" in values:
             self.captions = bool(values["captions"])
         if "visual_pulse" in values:
@@ -164,7 +164,7 @@ class NodeConfig:
     accessibility: AccessibilitySettings
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> NodeConfig:
+    def from_dict(cls, data: dict[str, Any]) -> NodeConfig:
         gpio = data.get("gpio", {}) or {}
         return cls(
             node_id=str(data.get("node_id", "node-unknown")),
@@ -202,7 +202,7 @@ class NodeService:
         auto_connect: bool = False,
     ) -> None:
         self.config_path = config_path
-        self._raw_config: Dict[str, Any] = {}
+        self._raw_config: dict[str, Any] = {}
         self.config = self._load_config()
 
         self._sensor = sensor or ProximitySensor()
@@ -391,7 +391,7 @@ class NodeService:
 
     # ------------------------------------------------------------------ Runtime loop
 
-    def run_once(self, now: Optional[float] = None) -> Dict[str, Any]:
+    def run_once(self, now: Optional[float] = None) -> dict[str, Any]:
         """Execute a single iteration of the service loop; returns telemetry for testing."""
         timestamp = now if now is not None else time.time()
         distance = self._sensor.read_distance_mm()
@@ -520,7 +520,7 @@ class NodeService:
 
     # ------------------------------------------------------------------ Heartbeat
 
-    def _publish_heartbeat_if_due(self, now: float) -> Optional[Dict[str, Any]]:
+    def _publish_heartbeat_if_due(self, now: float) -> Optional[dict[str, Any]]:
         if now - self._last_heartbeat_ts < self._heartbeat_interval:
             return None
 

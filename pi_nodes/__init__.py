@@ -1,10 +1,11 @@
-"""EchoTrace node service package (scaffold)."""
+"""EchoTrace node service package.
 
-__all__ = [
-    "audio_player",
-    "proximity_sensor",
-    "led_feedback",
-    "haptics",
-    "node_service",
-    "mqtt_topics",
-]
+This package provides the Raspberry Pi node components for the EchoTrace
+museum installation system, including:
+
+- Proximity sensing with VL53L1X time-of-flight sensors
+- Audio playback via pygame
+- LED feedback control via gpiozero
+- Haptic feedback control
+- MQTT communication with the central hub
+"""

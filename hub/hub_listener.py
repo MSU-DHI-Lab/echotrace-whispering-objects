@@ -8,7 +8,10 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import paho.mqtt.client as mqtt_types
 
 try:  # pragma: no cover - executed when paho-mqtt is installed
     import paho.mqtt.client as mqtt
@@ -47,15 +50,15 @@ class ConfigPushError(RuntimeError):
 class HubRuntimeState:
     """In-memory snapshot of hub observability data."""
 
-    last_seen: Dict[str, datetime] = field(default_factory=dict)
-    telemetry: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    last_seen: dict[str, datetime] = field(default_factory=dict)
+    telemetry: dict[str, dict[str, Any]] = field(default_factory=dict)
 
-    def update_health(self, node_id: str, timestamp: datetime, extra: Dict[str, Any]) -> None:
+    def update_health(self, node_id: str, timestamp: datetime, extra: dict[str, Any]) -> None:
         """Record the last time a heartbeat was observed for a node."""
         self.last_seen[node_id] = timestamp
         self.telemetry[node_id] = extra
 
-    def snapshot(self) -> Dict[str, Dict[str, Any]]:
+    def snapshot(self) -> dict[str, dict[str, Any]]:
         """Return status snapshot per node."""
         now = datetime.now(tz=timezone.utc)
         result = {}
@@ -73,7 +76,7 @@ class HubListener:
     def __init__(
         self,
         config: Optional[HubConfig] = None,
-        mqtt_client: Optional[mqtt.Client] = None,
+        mqtt_client: Optional[mqtt_types.Client] = None,
     ) -> None:
         if mqtt is None:
             raise RuntimeError("paho-mqtt must be installed to run the hub listener.")
@@ -90,7 +93,7 @@ class HubListener:
         )
         self._event_logger = CsvEventLogger(self._config.logs_dir)
 
-        self._ack_events: Dict[str, threading.Event] = {}
+        self._ack_events: dict[str, threading.Event] = {}
         self._ack_lock = threading.Lock()
 
     def start(self) -> None:
@@ -124,7 +127,7 @@ class HubListener:
     def push_node_config(
         self,
         node_id: str,
-        payload: Dict[str, object],
+        payload: dict[str, object],
         timeout: float = 5.0,
     ) -> bool:
         """Publish configuration updates to a node and await acknowledgement."""
@@ -170,11 +173,11 @@ class HubListener:
         self.publish_state()
         self._event_logger.record_event("admin_action", "hub", "Narrative state reset")
 
-    def get_state_snapshot(self) -> Dict[str, object]:
+    def get_state_snapshot(self) -> dict[str, object]:
         """Return the current narrative state snapshot."""
         return self._narrative.snapshot()
 
-    def get_health_snapshot(self) -> Dict[str, Dict[str, Any]]:
+    def get_health_snapshot(self) -> dict[str, dict[str, Any]]:
         """Return ages of the last heartbeat received per node."""
         return self._runtime.snapshot()
 
@@ -191,9 +194,9 @@ class HubListener:
 
     def _on_connect(
         self,
-        client: mqtt.Client,
+        client: mqtt_types.Client,
         _userdata: object,
-        _flags: Dict[str, int],
+        _flags: dict[str, int],
         rc: int,
     ) -> None:
         if rc != 0:
@@ -206,7 +209,7 @@ class HubListener:
 
     def _on_disconnect(
         self,
-        client: mqtt.Client,
+        client: mqtt_types.Client,
         _userdata: object,
         rc: int,
     ) -> None:
@@ -217,9 +220,9 @@ class HubListener:
 
     def _on_message(
         self,
-        _client: mqtt.Client,
+        _client: mqtt_types.Client,
         _userdata: object,
-        message: mqtt.MQTTMessage,
+        message: mqtt_types.MQTTMessage,
     ) -> None:
         topic = message.topic or ""
         payload = message.payload.decode("utf-8") if message.payload else ""
@@ -245,8 +248,6 @@ class HubListener:
         except json.JSONDecodeError:
             LOGGER.warning("Invalid health payload from %s: %s", node_id, payload)
             self._event_logger.record_event("heartbeat_received", node_id, "invalid_json")
-            return
-
             return
 
         extra = {

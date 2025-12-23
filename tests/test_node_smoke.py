@@ -32,7 +32,9 @@ class FakeMQTT:
         payload: str,
         qos: int = 0,
         retain: bool = False,
-    ) -> object:  # noqa: ARG002
+    ) -> object:
+        """Record a published message and return a success result."""
+        del qos, retain  # Unused parameters
         self.published.append((topic, json.loads(payload)))
 
         class Info:
